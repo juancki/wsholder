@@ -1,0 +1,10 @@
+syntax = "proto3";
+package wsholder;
+
+/* https://developers.google.com/protocol-buffers/docs/proto?csw=1#scalar */
+message ReplicationMessage{
+    repeated uint64 c_uuids = 1;
+    map<string,string> msg_mime = 2;
+    bytes msg = 3;
+}
+
