@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: replicationMessage.proto
 
-package wsholder
+package proto_pb
 
 import (
 	proto "github.com/golang/protobuf/proto"

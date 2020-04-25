@@ -9,8 +9,10 @@ import (
     "strconv"
     "encoding/binary"
     "strings"
+    // "google.golang.org/protobuf"
+    "github.com/golang/protobuf/proto"
     "./connectionPool"
-//    "./replicationMessage.db"
+    "./proto_pb"
 )
 
 
@@ -40,42 +42,42 @@ func connId(conn net.Conn) uint64{
     }
 }
 
-func backManager(pool *connectionPool.ConnectionPool, connection net.Conn){
-    // for true {
-    //     message, err := readMsg(connection)
-    //     if err != nil{
-    //         // Considerations on the errors
-    //     }
-    //     for index, conn_uuid := range.message.Conn_uuid(){
-    //         c := connectionPool.Get(conn_uuid)
-    //         if isConnectionClosed(c) {
-    //             targetConnection.Close()
-    //             connectionPool.Remove(conn_uuid)
-    //             log.Print("Dropping connection:",conn_uuid)
-    //             continue
-    //         }
-    //         writer := bufio.NewWriter(targetConnection)
-    //         writer.WriteString("Some message\n")
-    //         writer.Flush()
-    //     }
-    // }
+func backManager(pool *connectionPool.ConnectionPool, back_conn net.Conn){
+    reader := bufio.NewReader(back_conn)
+    repMsg := &proto_pb.ReplicationMessage{}
 
-    pool.Range(func(cobj *connectionPool.ConnectionObj, connId uint64) {
-        if cobj == nil || cobj.IsClosed(){
-            cobj.Close()
-            log.Print("Dropping connection:",connId)
-        }else{
-            cobj.WriteString("Some message\n")
-            // END Testing if net.Conn is open or close
+    for true {
+        if err := proto.Unmarshal(reader, repMsg); err != nil {
+            log.Fatalln("Failed to parse address book:", err)
         }
-    })
-    for true{
-        time.Sleep(2 * time.Second)
+        for index, conn_uuid := range message.CUuids(){
+            c := connectionPool.Get(conn_uuid)
+            if c.IsClosed(){
+                c.Close()
+                connectionPool.Remove(conn_uuid)
+                log.Print("Dropping connection:",conn_uuid)
+                continue
+            }
+            writer := bufio.NewWriter(targetConnection)
+            writer.WriteString("Some message\n")
+            writer.Flush()
         }
-
-    connection.Close()
-    // remove connection from bool
-    // connectionPool.Remove(connectionId)
+    }
+    // pool.Range(func(cobj *connectionPool.ConnectionObj, connId uint64) {
+    //     if cobj == nil || cobj.IsClosed(){
+    //         cobj.Close()
+    //         log.Print("Dropping connection:",connId)
+    //     }else{
+    //         cobj.WriteString("Some message\n")
+    //         // END Testing if net.Conn is open or close
+    //     }
+    // })
+    // for true{
+    //     time.Sleep(2 * time.Second)
+    //     }
+    // back_con.Close()
+    // // remove connection from bool
+    // // connectionPool.Remove(connectionId)
 
 }
 
