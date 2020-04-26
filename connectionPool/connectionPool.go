@@ -1,38 +1,39 @@
 package connectionPool
 
 import (
+	"bufio"
+        "errors"
 	"net"
 	"sync"
-    "bufio"
-    "time"
+	"time"
 )
 
 // ConnectionPool is a thread safe list of net.Conn instances
 type ConnectionPool struct {
-	mutex sync.RWMutex
-	list  map[uint64]*ConnectionObj // Custom struct to manage net.Conn
+    mutex sync.RWMutex
+    list  map[uint64]*ConnectionObj // Custom struct to manage net.Conn
 }
 
 type ConnectionObj struct {
-	mutex sync.RWMutex
+    mutex sync.RWMutex
     time time.Time
     conn net.Conn
 }
 
 // Closes socekt.
 func (cobj *ConnectionObj) Close(){
-	cobj.mutex.Lock()
+    cobj.mutex.Lock()
     cobj.conn.Close()
-	cobj.mutex.Unlock()
+    cobj.mutex.Unlock()
 }
 
 // Closes socekt.
 func (cobj *ConnectionObj) WriteString(s string){
-	cobj.mutex.Lock()
+    cobj.mutex.Lock()
     writer := bufio.NewWriter(cobj.conn)
     writer.WriteString("Some message\n")
     writer.Flush()
-	cobj.mutex.Unlock()
+    cobj.mutex.Unlock()
 }
 
 // Closes socekt.
@@ -66,7 +67,7 @@ func (pool *ConnectionPool) Add(conn_uuid uint64,connection net.Conn) {
 	pool.mutex.Unlock()
 }
 
-// Get connection by id
+// Get connection by id, obj returned not thread safe, use GetHandler
 func (pool *ConnectionPool) Get(conn_uuid uint64) net.Conn {
 	pool.mutex.RLock()
 	connectionObj,ok := pool.list[conn_uuid]
@@ -77,6 +78,16 @@ func (pool *ConnectionPool) Get(conn_uuid uint64) net.Conn {
 	return (*connectionObj).conn
 }
 
+// Get connection by id, obj returned thread safe
+func (pool *ConnectionPool) GetHandler(conn_uuid uint64) (*ConnectionObj,error){
+    pool.mutex.RLock()
+    connectionObj,ok := pool.list[conn_uuid]
+    pool.mutex.RUnlock()
+    if !ok{
+        return nil,errors.New("Connection with uuid not found")
+    }
+    return connectionObj,nil
+}
 // Remove connection from pool
 func (pool *ConnectionPool) Remove(conn_uuid uint64) {
 	pool.mutex.Lock()

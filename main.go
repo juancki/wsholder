@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -14,6 +15,60 @@ import (
     "./connectionPool"
     "./pb"
 )
+// Add connection to REDIS and save when a connection gets into front.
+
+// Config
+// TODO add config for front_server port and back_server port
+// TODO add config set for redis storge directions
+
+
+
+var pool connectionPool.ConnectionPool
+
+// server is used to implement helloworld.GreeterServer.
+type server struct {
+	pb.UnimplementedWsBackServer
+}
+
+
+
+func (s *server) Replicate(reps pb.WsBack_ReplicateServer) (error) {
+	log.Printf("Received it!")
+        loop := 0
+        for true {
+	    // rep := new(pb.ReplicationMsg)
+            rep, err := reps.Recv()
+            if err != nil{
+                log.Println(err," ",loop)
+                break
+            }
+            // TODO send rep to channel
+            serveReplication(rep)
+            log.Println(rep)
+            loop+=1
+        }
+	return nil
+}
+
+
+func serveReplication(rep *pb.ReplicationMsg) {
+    // TODO read rep from channel and be a for true gorutine
+    for _, conn_uuid := range rep.CUuids{
+        c,err := pool.GetHandler(conn_uuid)
+        if err != nil{
+            // TODO: Connection not found, delete from REDIS ?
+            log.Print("Connection ",conn_uuid," was not found")
+            continue
+        }
+        if c.IsClosed(){
+            c.Close()
+            pool.Remove(conn_uuid)
+            log.Print("Dropping connection:",conn_uuid)
+            continue
+        }
+        c.WriteString("Some message\n")
+    }
+}
 
 
 func connId(conn net.Conn) uint64{
@@ -43,64 +98,7 @@ func connId(conn net.Conn) uint64{
 }
 
 
-
-func backManager(pool *connectionPool.ConnectionPool, back_conn net.Conn){
-    reader := bufio.NewReader(back_conn)
-    repMsg := &pb.ReplicationMsg{}
-
-    for true {
-        if err := proto.Unmarshal(reader, repMsg); err != nil {
-            log.Fatalln("Failed to parse address book:", err)
-        }
-        for index, conn_uuid := range repMsg.CUuids(){
-            c := pool.Get(conn_uuid)
-            if c.IsClosed(){
-                c.Close()
-                pool.Remove(conn_uuid)
-                log.Print("Dropping connection:",conn_uuid)
-                continue
-            }
-            writer := bufio.NewWriter(targetConnection)
-            writer.WriteString("Some message\n")
-            writer.Flush()
-        }
-    }
-    // pool.Range(func(cobj *connectionPool.ConnectionObj, connId uint64) {
-    //     if cobj == nil || cobj.IsClosed(){
-    //         cobj.Close()
-    //         log.Print("Dropping connection:",connId)
-    //     }else{
-    //         cobj.WriteString("Some message\n")
-    //         // END Testing if net.Conn is open or close
-    //     }
-    // })
-    // for true{
-    //     time.Sleep(2 * time.Second)
-    //     }
-    // back_con.Close()
-    // // remove connection from bool
-    // // connectionPool.Remove(connectionId)
-
-}
-/**/
-/**/
-
-/**/
-/**/
-
-func rutineBack(connectionPool *connectionPool.ConnectionPool){
-    addr := "127.0.0.1:8090"
-    log.Print("Starting ws back: ",addr)
-    socket1, _ := net.Listen("tcp", addr)
-    for true{
-        connection, _ := socket1.Accept()
-        log.Print("New backendconnection: ", connection.RemoteAddr().String())
-        go backManager(connectionPool, connection)
-    }
-}
-
-
-func rutineFront(connectionPool *connectionPool.ConnectionPool){
+func rutineFront(){
     addr := "127.0.0.1:8080"
     log.Print("Starting ws front: ",addr)
     socket, err := net.Listen("tcp", addr)
@@ -113,30 +111,44 @@ func rutineFront(connectionPool *connectionPool.ConnectionPool){
     // accept connection
     for true {
         connection, _ := socket.Accept()
-        i := connId(connection)
+        ID := connId(connection)
         writer := bufio.NewWriter(connection)
         writer.WriteString("Ack\n")
         writer.Flush()
         // add connection to pool
-        connectionPool.Add(uint64(i), connection)
-        log.Print("New connection id:",i)
+        pool.Add(uint64(ID), connection)
+        // TODO add connection to REDIS
+        log.Print("New connection id:",ID)
     }
 }
 
-func main(){
+func rutineBack(){
+    addr := "127.0.0.1:8090"
+    log.Print("Starting ws back: ",addr)
+    lis, err := net.Listen("tcp",address)
+    if err != nil {
+        log.Fatalf("failed to listen: %v", err)
+    }
+    s := grpc.NewServer()
+    pb.RegisterWsBackServer(s, &server{})
+    if err := s.Serve(lis); err != nil {
+        log.Fatalf("failed to serve: %v", err)
+    }
+}
+
+func main() {
     fmt.Println("Starting wsholder, will listen 8080 and 8090 for front and back")
     fmt.Println("---------------------------------------------------------------")
-    connectionPool := connectionPool.NewConnectionPool()
-    go rutineFront(connectionPool)
-    go rutineBack(connectionPool)
+    pool = *connectionPool.NewConnectionPool()
+    go rutineFront()
+    go rutineBack()
+    // End rutineBack()
 
     // count of connections in pool
 
     for true {
-        time.Sleep(2 * time.Second)
-        size := connectionPool.Size()
-        log.Print("Size: %d",size)
+        time.Sleep(5 * time.Second)
+        size := pool.Size()
+        log.Print("Size: ",size)
     }
-
 }
-
