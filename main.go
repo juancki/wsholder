@@ -9,10 +9,10 @@ import (
     "strconv"
     "encoding/binary"
     "strings"
-    // "google.golang.org/protobuf"
-    "github.com/golang/protobuf/proto"
+
+    "google.golang.org/grpc"
     "./connectionPool"
-    "./proto_pb"
+    "./pb"
 )
 
 
@@ -42,19 +42,21 @@ func connId(conn net.Conn) uint64{
     }
 }
 
+
+
 func backManager(pool *connectionPool.ConnectionPool, back_conn net.Conn){
     reader := bufio.NewReader(back_conn)
-    repMsg := &proto_pb.ReplicationMessage{}
+    repMsg := &pb.ReplicationMsg{}
 
     for true {
         if err := proto.Unmarshal(reader, repMsg); err != nil {
             log.Fatalln("Failed to parse address book:", err)
         }
-        for index, conn_uuid := range message.CUuids(){
-            c := connectionPool.Get(conn_uuid)
+        for index, conn_uuid := range repMsg.CUuids(){
+            c := pool.Get(conn_uuid)
             if c.IsClosed(){
                 c.Close()
-                connectionPool.Remove(conn_uuid)
+                pool.Remove(conn_uuid)
                 log.Print("Dropping connection:",conn_uuid)
                 continue
             }
@@ -80,6 +82,11 @@ func backManager(pool *connectionPool.ConnectionPool, back_conn net.Conn){
     // // connectionPool.Remove(connectionId)
 
 }
+/**/
+/**/
+
+/**/
+/**/
 
 func rutineBack(connectionPool *connectionPool.ConnectionPool){
     addr := "127.0.0.1:8090"
