@@ -17,6 +17,11 @@ message Empty {
 }
 
 
+// TODO Maybe add (resource string) to indicate http resource?
+// Can be done with msg_mime['Resource'] to overcome issue
+// TODO add meta information to indicate:
+//      + message for all.
+//      + message for all with given prefix
 message ReplicationMsg{
     repeated uint64 c_uuids = 1;
     map<string,string> msg_mime = 2;

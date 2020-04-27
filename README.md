@@ -30,7 +30,6 @@ go run main.go
 go run replicate/client/main.go -port=8090 -uuids=139637976836088,139637976836098
 
 
-======
 
 DESIGN
 ======
@@ -43,3 +42,10 @@ in a key,value map: being the key the connectionId (uuid).
 From the serverside (back) a gRPC server waits for messages from the
 server with (uudis,message). This message is then transferred to all
 the clients lited in the uuids.
+
+
+
+POSGRESQL Spatial db
+====================
+https://computingforgeeks.com/how-to-install-postgis-on-ubuntu-debian/
+https://postgis.net/install/
