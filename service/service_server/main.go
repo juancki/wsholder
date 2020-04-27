@@ -27,7 +27,6 @@ type server struct {
 // SayHello implements helloworld.GreeterServer
 func (s *server) LotsOfReplies(in *pb.Empty, lotsreplies pb.Service_LotsOfRepliesServer) (error) {
 	log.Printf("Received it!")
-	ids := []uint64{1,2}
 	var mime = map[string]string{
 		"Content-type": "text",
 		"Content-length": "32",
@@ -35,11 +34,12 @@ func (s *server) LotsOfReplies(in *pb.Empty, lotsreplies pb.Service_LotsOfReplie
 	str := "My content of the message"
 	msg := []byte(str)
 
-	rep := new(pb.ReplicationMsg)
-	rep.CUuids=ids
+	rep := new(pb.UniMsg)
 	rep.MsgMime = mime
 	rep.Msg = msg
-	lotsreplies.Send(rep)
+        for i:=0; i<10;i++{
+	    lotsreplies.Send(rep)
+        }
 // 	rep := &pb.ReplicationMsg{
 // 		CUuids : ids,
 // 		MsgMime : mime,

@@ -2,7 +2,8 @@ package connectionPool
 
 import (
 	"bufio"
-        "errors"
+	"errors"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -27,11 +28,23 @@ func (cobj *ConnectionObj) Close(){
     cobj.mutex.Unlock()
 }
 
-// Closes socekt.
+// Writes bytes.
+func (cobj *ConnectionObj) Write(b []byte){
+    cobj.mutex.Lock()
+    writer := bufio.NewWriter(cobj.conn)
+    _,err  :=writer.Write(b)
+    if err != nil {
+        log.Fatal(err)
+    }
+    writer.Flush()
+    cobj.mutex.Unlock()
+}
+
+// Writes String.
 func (cobj *ConnectionObj) WriteString(s string){
     cobj.mutex.Lock()
     writer := bufio.NewWriter(cobj.conn)
-    writer.WriteString("Some message\n")
+    writer.WriteString(s)
     writer.Flush()
     cobj.mutex.Unlock()
 }

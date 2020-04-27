@@ -2,18 +2,19 @@
 package main
 
 import (
-    "log"
-    "time"
-    "fmt"
-    "net"
-    "bufio"
-    "strconv"
-    "encoding/binary"
-    "strings"
+	"bufio"
+	"encoding/binary"
+	"fmt"
+	"log"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 
-    "google.golang.org/grpc"
-    "./connectionPool"
-    "./pb"
+	"./connectionPool"
+	"./pb"
+	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc"
 )
 // Add connection to REDIS and save when a connection gets into front.
 
@@ -21,6 +22,10 @@ import (
 // TODO add config for front_server port and back_server port
 // TODO add config set for redis storge directions
 
+// logs
+// TODO fix `rpc error: code = Canceled desc = context canceled` error
+// TODO add connection debug option/service that indicates for 
+//      a Replications Msg which connection ids where forwarded and which not.
 
 
 var pool connectionPool.ConnectionPool
@@ -39,7 +44,7 @@ func (s *server) Replicate(reps pb.WsBack_ReplicateServer) (error) {
 	    // rep := new(pb.ReplicationMsg)
             rep, err := reps.Recv()
             if err != nil{
-                log.Println(err," ",loop)
+                // connexion droped
                 break
             }
             // TODO send rep to channel
@@ -66,7 +71,11 @@ func serveReplication(rep *pb.ReplicationMsg) {
             log.Print("Dropping connection:",conn_uuid)
             continue
         }
-        c.WriteString("Some message\n")
+        msg := &pb.UniMsg{}
+        msg.Msg = rep.Msg
+        msg.MsgMime = rep.MsgMime
+        bts, err := proto.Marshal(msg)
+        c.Write(bts)
     }
 }
 
@@ -125,7 +134,7 @@ func rutineFront(){
 func rutineBack(){
     addr := "127.0.0.1:8090"
     log.Print("Starting ws back: ",addr)
-    lis, err := net.Listen("tcp",address)
+    lis, err := net.Listen("tcp",addr)
     if err != nil {
         log.Fatalf("failed to listen: %v", err)
     }

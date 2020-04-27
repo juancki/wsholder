@@ -1,15 +1,30 @@
 syntax = "proto3";
 
 option go_package="pb";
-
-import "ReplicationMsg.proto";
-
 package pb;
 
 /* https://developers.google.com/protocol-buffers/docs/proto?csw=1#scalar */
 
+
 service wsBack{
   rpc Replicate(stream ReplicationMsg) returns (Empty);
+}
+
+
+
+message Empty {
+
+}
+
+
+message ReplicationMsg{
+    repeated uint64 c_uuids = 1;
+    map<string,string> msg_mime = 2;
+    bytes msg = 3;
+}
+
+service Service {
+  rpc LotsOfReplies(Empty) returns (stream UniMsg);
 }
 
 
