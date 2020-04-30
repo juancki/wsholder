@@ -11,8 +11,8 @@ import (
     "strconv"
     "strings"
     "time"
-    "./connectionPool"
-    "./pb"
+    cPool "github.com/juancki/wsholder/connectionPool"
+    "github.com/juancki/wsholder/pb"
     "github.com/golang/protobuf/proto"
     "google.golang.org/grpc"
 )
@@ -25,7 +25,7 @@ import (
 //      a Replications Msg which connection ids where forwarded and which not.
 
 
-var pool connectionPool.ConnectionPool
+var pool cPool.ConnectionPool
 
 // server is used to implement helloworld.GreeterServer.
 type server struct {
@@ -77,7 +77,7 @@ func serveReplication(rep *pb.ReplicationMsg) {
 }
 
 
-func connId(conn net.Conn) uint64{
+func connId(conn net.Conn) cPool.Uuid{
     addr := conn.RemoteAddr().String()
     ind := strings.Index(addr,":")
     if ind <= 5{
@@ -119,7 +119,7 @@ func rutineFront(addr string){
         writer.WriteString("Ack\n")
         writer.Flush()
         // add connection to pool
-        pool.Add(uint64(ID), connection)
+        pool.Add(cPool.Uuid(ID), connection)
         // TODO add connection to REDIS
         log.Print("New connection id:",ID)
     }
@@ -166,7 +166,7 @@ func main() {
     fmt.Println("Starting wsholder...") // ,*frontport,"for front, ",*backport," for back")
     setupRedis(redisid[0],redisid[1],redisAddr)
     fmt.Println("--------------------------------------------------------------- ")
-    pool = *connectionPool.NewConnectionPool()
+    pool = *cPool.NewConnectionPool()
     go rutineFront(fport)
     go rutineBack(bport)
     // End rutineBack()

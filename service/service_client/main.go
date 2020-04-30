@@ -8,7 +8,7 @@ import (
     "time"
 
     "google.golang.org/grpc"
-    "../../pb"
+    "github.com/juancki/wsholder/pb"
 )
 
 

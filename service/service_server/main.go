@@ -12,7 +12,7 @@ import (
 
     "google.golang.org/grpc"
 //    "../connectionPool"
-    "../../pb"
+    "github.com/juancki/wsholder/pb"
 )
 
 const (

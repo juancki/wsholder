@@ -7,12 +7,35 @@ import (
 	"net"
 	"sync"
 	"time"
+	"encoding/base64"
+	"encoding/binary"
 )
 
+type (Uuid = uint64)
+// Converstion types utils
+// Returns string from UUID currently uint64
+func Uuid2base64(uuid Uuid) string{
+    bts := make([]byte,8)
+    binary.PutUvarint(bts,uuid)
+    return base64.RawStdEncoding.EncodeToString(bts)
+}
+// Returns uuid based on base64 encoding
+func Base64_2_uuid(str string) (Uuid,error){
+    bts,err := base64.StdEncoding.DecodeString(str)
+    if err != nil{
+        return 0, err
+    }
+    result, l :=  binary.Uvarint(bts)
+
+    if l == 0{
+        return 0, errors.New("Unable to cast fronm base64 to uuid in base64_2_uuid")
+    }
+    return Uuid(result),nil
+}
 // ConnectionPool is a thread safe list of net.Conn instances
 type ConnectionPool struct {
     mutex sync.RWMutex
-    list  map[uint64]*ConnectionObj // Custom struct to manage net.Conn
+    list  map[Uuid]*ConnectionObj // Custom struct to manage net.Conn
 }
 
 type ConnectionObj struct {
@@ -65,13 +88,13 @@ func (cobj *ConnectionObj) IsClosed() bool {
 // NewConnectionPool is the factory method to create new connection pool
 func NewConnectionPool() *ConnectionPool {
 	pool := &ConnectionPool{
-		list: make(map[uint64]*ConnectionObj),
+		list: make(map[Uuid]*ConnectionObj),
 	}
 	return pool
 }
 
 // Add collection to pool
-func (pool *ConnectionPool) Add(conn_uuid uint64,connection net.Conn) {
+func (pool *ConnectionPool) Add(conn_uuid Uuid,connection net.Conn) {
     conn := new(ConnectionObj)
     conn.time = time.Now()
     conn.conn = connection
@@ -81,7 +104,7 @@ func (pool *ConnectionPool) Add(conn_uuid uint64,connection net.Conn) {
 }
 
 // Get connection by id, obj returned not thread safe, use GetHandler
-func (pool *ConnectionPool) Get(conn_uuid uint64) net.Conn {
+func (pool *ConnectionPool) Get(conn_uuid Uuid) net.Conn {
 	pool.mutex.RLock()
 	connectionObj,ok := pool.list[conn_uuid]
 	pool.mutex.RUnlock()
@@ -92,7 +115,7 @@ func (pool *ConnectionPool) Get(conn_uuid uint64) net.Conn {
 }
 
 // Get connection by id, obj returned thread safe
-func (pool *ConnectionPool) GetHandler(conn_uuid uint64) (*ConnectionObj,error){
+func (pool *ConnectionPool) GetHandler(conn_uuid Uuid) (*ConnectionObj,error){
     pool.mutex.RLock()
     connectionObj,ok := pool.list[conn_uuid]
     pool.mutex.RUnlock()
@@ -102,7 +125,7 @@ func (pool *ConnectionPool) GetHandler(conn_uuid uint64) (*ConnectionObj,error){
     return connectionObj,nil
 }
 // Remove connection from pool
-func (pool *ConnectionPool) Remove(conn_uuid uint64) {
+func (pool *ConnectionPool) Remove(conn_uuid Uuid) {
 	pool.mutex.Lock()
 	delete(pool.list, conn_uuid)
 	pool.mutex.Unlock()
@@ -114,7 +137,7 @@ func (pool *ConnectionPool) Size() int {
 }
 
 // Range iterates over pool
-func (pool *ConnectionPool) Range(callback func(*ConnectionObj, uint64)) {
+func (pool *ConnectionPool) Range(callback func(*ConnectionObj, Uuid)) {
 	pool.mutex.RLock()
 	for conn_uuid, connection := range pool.list {
 		callback(connection, conn_uuid)
