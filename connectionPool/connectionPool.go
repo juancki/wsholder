@@ -23,6 +23,7 @@ func Uuid2base64(uuid Uuid) string{
 func Base64_2_uuid(str string) (Uuid,error){
     bts,err := base64.StdEncoding.DecodeString(str)
     if err != nil{
+        log.Print("Base64_2_uuid input: `",str,"`")
         return 0, err
     }
     result, l :=  binary.Uvarint(bts)
