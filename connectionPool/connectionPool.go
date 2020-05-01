@@ -21,7 +21,7 @@ func Uuid2base64(uuid Uuid) string{
 }
 // Returns uuid based on base64 encoding
 func Base64_2_uuid(str string) (Uuid,error){
-    bts,err := base64.StdEncoding.DecodeString(str)
+    bts,err := base64.RawStdEncoding.DecodeString(str)
     if err != nil{
         return 0, err
     }
