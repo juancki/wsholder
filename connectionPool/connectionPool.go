@@ -17,11 +17,11 @@ type (Uuid = uint64)
 func Uuid2base64(uuid Uuid) string{
     bts := make([]byte,8)
     binary.PutUvarint(bts,uuid)
-    return base64.RawStdEncoding.EncodeToString(bts)
+    return base64.StdEncoding.EncodeToString(bts)
 }
 // Returns uuid based on base64 encoding
 func Base64_2_uuid(str string) (Uuid,error){
-    bts,err := base64.RawStdEncoding.DecodeString(str)
+    bts,err := base64.StdEncoding.DecodeString(str)
     if err != nil{
         return 0, err
     }
