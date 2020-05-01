@@ -20,14 +20,27 @@ import (
 	"github.com/juancki/wsholder/pb"
 	"google.golang.org/grpc"
 )
-// Add connection to REDIS and save when a connection gets into front.
+// TODO Add connection to REDIS and save when a connection gets into front.
 
 // Config
 
 // logs
 // TODO add connection debug option/service that indicates for 
 //      a Replications Msg which connection ids where forwarded and which not.
+// TODO clean logs
 
+// TODO create tests wsholder + Redis
+// TODO create docker composer to set everything up at same time
+
+// TODO find way the function cPool.Base64_2_Uuid was not working and now does (remove log line)
+
+// FEATURES 
+// TODO TODO Define incomming messages structure, sending bytes through socket not the greatest idea.
+// TODO send messages to Postgre to save them for posterity.
+// TODO know when a connection is closed reliably. (*connectionPool) IsClosed does not work
+// TODO delete entries from rgeoclient when front connections drop.
+
+// TODO create library for Redis/Postgre connections ¿?
 
 var pool cPool.ConnectionPool
 const WORLD = "world"
@@ -47,11 +60,12 @@ func (s *server) Replicate(reps pb.WsBack_ReplicateServer) (error) {
             rep, err := reps.Recv()
             if err != nil{
                 // connexion droped
+                log.Print("connection dropped")
                 break
             }
+            log.Print(rep)
             // TODO send rep to channel
             serveReplication(rep)
-            log.Println(rep)
             loop+=1
         }
 	return nil
@@ -67,16 +81,20 @@ func serveReplication(rep *pb.ReplicationMsg) {
             log.Print("Connection ",conn_uuid," was not found")
             continue
         }
-        if c.IsClosed(){
-            c.Close()
-            pool.Remove(conn_uuid)
-            log.Print("Dropping connection:",conn_uuid)
-            continue
-        }
+        // if c.IsClosed(){
+        //     c.Close()
+        //     pool.Remove(conn_uuid)
+        //     log.Print("Dropping connection:",conn_uuid)
+        //     continue
+        // }
         msg := &pb.UniMsg{}
         msg.Msg = rep.Msg
         msg.MsgMime = rep.MsgMime
         bts, err := proto.Marshal(msg)
+        if err != nil {
+            log.Print("Unable to marshal message")
+            continue
+        }
         c.Write(bts)
     }
 }
