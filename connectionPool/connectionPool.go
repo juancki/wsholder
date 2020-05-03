@@ -94,7 +94,6 @@ func ConnId(conn net.Conn) Uuid{
 
 // Writes bytes.
 func (cobj *ConnectionObj) Write(b []byte, errchan chan Uuid){
-    log.Print("Ready: ", cobj.uuid)
     cobj.mutex.Lock()
     nn, err := cobj.conn.Write(b)
     cobj.mutex.Unlock()

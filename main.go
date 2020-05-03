@@ -50,11 +50,12 @@ type server struct {
 }
 
 
-// Removes uuid from the redis geo database
-func (rgeo *Redis) geoRemove(uuid cPool.Uuid){
+// Removes uuid from the redis geo database (thread safe).
+func (rgeo *Redis) geoRemove(uuid cPool.Uuid) error {
     rgeo.Lock()
-    rgeo.redis.ZRem(WORLD,uuid)
+    res := rgeo.redis.ZRem(WORLD,cPool.Uuid2base64(uuid))
     rgeo.Unlock()
+    return res.Err()
 }
 
 func replicateErr(errchan chan cPool.Uuid){
@@ -63,7 +64,10 @@ func replicateErr(errchan chan cPool.Uuid){
         // Delete from cPool
         pool.Remove(uuid)
         // Delete from Redis geo
-        rgeoclient.geoRemove(uuid)
+        err := rgeoclient.geoRemove(uuid)
+        if err!=nil{
+            log.Print("Trying to geoRemove error: ", err)
+        }
     }
 }
 
