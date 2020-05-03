@@ -4,7 +4,6 @@ package main
 import (
 	"bufio"
 	"encoding/base64"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"log"
@@ -51,8 +50,26 @@ type server struct {
 }
 
 
+// Removes uuid from the redis geo database
+func (rgeo *Redis) geoRemove(uuid cPool.Uuid){
+    rgeo.Lock()
+    rgeo.redis.ZRem(WORLD,uuid)
+    rgeo.Unlock()
+}
+
+func replicateErr(errchan chan cPool.Uuid){
+    for uuid := range errchan{
+        log.Println("Error channel: ",uuid)
+        // Delete from cPool
+        pool.Remove(uuid)
+        // Delete from Redis geo
+        rgeoclient.geoRemove(uuid)
+    }
+}
 
 func (s *server) Replicate(reps pb.WsBack_ReplicateServer) (error) {
+        errchan := make(chan cPool.Uuid,10)
+        go replicateErr(errchan)
 	log.Printf("Received it!")
         loop := 0
         for true {
@@ -60,19 +77,18 @@ func (s *server) Replicate(reps pb.WsBack_ReplicateServer) (error) {
             rep, err := reps.Recv()
             if err != nil{
                 // connexion droped
-                log.Print("connection dropped")
-                break
+                log.Print("#Messages received: ", loop, ". Stop reason: ", err)
+                return nil
             }
-            log.Print(rep)
             // TODO send rep to channel
-            serveReplication(rep)
+            serveReplication(rep,errchan)
             loop+=1
         }
 	return nil
 }
 
 
-func serveReplication(rep *pb.ReplicationMsg) {
+func serveReplication(rep *pb.ReplicationMsg, errchan chan cPool.Uuid) {
     // TODO read rep from channel and be a for true gorutine
     for _, conn_uuid := range rep.CUuids{
         c,err := pool.GetHandler(conn_uuid)
@@ -81,11 +97,7 @@ func serveReplication(rep *pb.ReplicationMsg) {
             log.Print("Connection ",conn_uuid," was not found")
             continue
         }
-        // if c.IsClosed(){
-        //     c.Close()
-        //     pool.Remove(conn_uuid)
-        //     log.Print("Dropping connection:",conn_uuid)
-        //     continue
+        // TODO if c.IsClosed(){
         // }
         msg := &pb.UniMsg{}
         msg.Msg = rep.Msg
@@ -95,35 +107,10 @@ func serveReplication(rep *pb.ReplicationMsg) {
             log.Print("Unable to marshal message")
             continue
         }
-        c.Write(bts)
+        go c.Write(bts, errchan)
     }
 }
 
-
-func connId(conn net.Conn) cPool.Uuid{
-    addr := conn.RemoteAddr().String()
-    ind := strings.Index(addr,":")
-    if ind <= 5{
-        // TODO: Add support for IPv6
-        log.Print("IP ParsingERRO IPv6 addr not supported, if used localhost -> use 127.0.0.1")
-        return 0
-    }else{
-        // IPv4
-        port, _ := strconv.ParseUint(addr[ind+1:],10,16)
-        ip := net.ParseIP(addr[0:ind])
-        if ip == nil {
-            log.Print("IP ParsingERROR:", addr[0:ind])
-        }
-        dst := make([]byte,8)
-        // TODO: Include ws holder ip as identifier
-        dst[0] = 0
-        dst[1] = 0
-        copy(dst[2:6],ip[12:])
-        dst[6] = byte(port >> 8)
-        dst[7] = byte(port &0x00FF)
-        return binary.BigEndian.Uint64(dst)
-    }
-}
 
 func coorFromBase64(str string) (float64,float64){
     // log.Println("entering coorFromBase64")
@@ -147,13 +134,12 @@ func coorFromBase64(str string) (float64,float64){
 
 
 func addToPoolAndUpdateRedis(cn net.Conn) error {
-    ID := connId(cn)
+    ID := cPool.ConnId(cn)
     writer := bufio.NewWriter(cn)
     writer.WriteString("Ack\n")
     writer.Flush()
     // ADD to POOL 
     pool.Add(cPool.Uuid(ID), cn)
-    log.Println("New connection id:",ID)
     bts := make([]byte,100) // Decide token size
     read, err := cn.Read(bts)
     if err != nil{
@@ -161,10 +147,7 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
     }
     token := string(bts[1:read-1])
     // UPDATE REDIS
-    log.Println(token)
-    log.Println("$2a$04$1B2TiNo0fhO1j0pXa/FPYeGOxOm9CRfkVN3pIb5Vaknwfl936/CpC")
     appendError := rclient.redis.Append(token,cPool.Uuid2base64(ID)).Err()
-    rclient.Get("$2a$04$1B2TiNo0fhO1j0pXa/FPYeGOxOm9CRfkVN3pIb5Vaknwfl936/CpC")
     value, err := rclient.Get(token)
     if appendError != nil {
         log.Println(appendError)
@@ -175,7 +158,6 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
         return err
     }
     // value from the key,value store
-    log.Println("The value is: ", value)
     long,lat := coorFromBase64(value)
     geoloc := &redis.GeoLocation{}
     geoloc.Latitude = lat
@@ -188,7 +170,7 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
         log.Println(geoAdd.Err())
         return geoAdd.Err()
     }
-    log.Println("Geoadd succesful")
+    log.Println("Geoadd succesful, UUID: ", ID)
     return nil
 }
 
@@ -196,7 +178,7 @@ func manageFrontError(c net.Conn){
     c.SetWriteDeadline(time.Now().Add(time.Millisecond*2))
     c.Write([]byte("Error in connection"))
     c.Close()
-    pool.Remove(connId(c))
+    pool.Remove(cPool.ConnId(c))
 }
 
 func rutineFront(addr string){
@@ -284,7 +266,6 @@ func (*Redis) Get(key string) (string,error){
         log.Println("Not succesful: ", key, " ", err)
         return "",err
     }
-    log.Println("Succesful: ", key, " ", val)
     return val, nil
 }
 
@@ -331,6 +312,6 @@ func main() {
         // TODO: Logging stay alive, remove before prod
         size := pool.Size()
         log.Print("Size: ",size)
-        time.Sleep(10 * time.Second)
+        time.Sleep(100 * time.Second)
     }
 }

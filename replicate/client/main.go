@@ -18,6 +18,7 @@ func main() {
         address := "localhost:"
         port := flag.String("port", "50066", "port to connect")
         connUuids := flag.String("uuids", "1,2","uuids with commas")
+        count_max := flag.Int("max", 1,"Number of msgs to send.")
         flag.Parse()
 	// Set up a connection to the server.
         log.Print("Accessing: ",address,":",*port)
@@ -44,7 +45,7 @@ func main() {
             if err == nil{
                 ids = append(ids,uint64(eq))
             }else{
-                log.Fatal("connection Uuid: unable to cast ",eq," to intger") 
+                log.Fatal("connection Uuid: unable to cast ",eq," to intger")
             }
         }
         log.Print("Uuids: ", ids)
@@ -60,7 +61,7 @@ func main() {
 	rep.CUuids=ids
 	rep.MsgMime = mime
 	rep.Msg = msg
-        for count:=0; count<10; count++{
+        for count:=0; count<*count_max; count++{
 	    err = r.Send(rep)
 	    if err != nil {
 	        log.Print("could not greet: ", err, " ",count)

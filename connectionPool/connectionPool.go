@@ -7,6 +7,10 @@ import (
 	"net"
 	"sync"
 	"time"
+	"runtime"
+	"strconv"
+	"strings"
+	"bytes"
 	"encoding/base64"
 	"encoding/binary"
 )
@@ -43,6 +47,7 @@ type ConnectionObj struct {
     mutex sync.RWMutex
     time time.Time
     conn net.Conn
+    uuid Uuid
 }
 
 // Closes socekt.
@@ -52,16 +57,53 @@ func (cobj *ConnectionObj) Close(){
     cobj.mutex.Unlock()
 }
 
-// Writes bytes.
-func (cobj *ConnectionObj) Write(b []byte){
-    cobj.mutex.Lock()
-    writer := bufio.NewWriter(cobj.conn)
-    _,err  :=writer.Write(b)
-    if err != nil {
-        log.Fatal(err)
+func getGID() uint64 {
+    b := make([]byte, 64)
+    b = b[:runtime.Stack(b, false)]
+    b = bytes.TrimPrefix(b, []byte("goroutine "))
+    b = b[:bytes.IndexByte(b, ' ')]
+    n, _ := strconv.ParseUint(string(b), 10, 64)
+    return n
+}
+
+func ConnId(conn net.Conn) Uuid{
+    addr := conn.RemoteAddr().String()
+    ind := strings.Index(addr,":")
+    if ind <= 5{
+        // TODO: Add support for IPv6
+        log.Print("IP ParsingERRO IPv6 addr not supported, if used localhost -> use 127.0.0.1")
+        return 0
+    }else{
+        // IPv4
+        port, _ := strconv.ParseUint(addr[ind+1:],10,16)
+        ip := net.ParseIP(addr[0:ind])
+        if ip == nil {
+            log.Print("IP ParsingERROR:", addr[0:ind])
+        }
+        dst := make([]byte,8)
+        // TODO: Include ws holder ip as identifier
+        dst[0] = 0
+        dst[1] = 0
+        copy(dst[2:6],ip[12:])
+        dst[6] = byte(port >> 8)
+        dst[7] = byte(port &0x00FF)
+        return binary.BigEndian.Uint64(dst)
     }
-    writer.Flush()
+}
+
+
+// Writes bytes.
+func (cobj *ConnectionObj) Write(b []byte, errchan chan Uuid){
+    log.Print("Ready: ", cobj.uuid)
+    cobj.mutex.Lock()
+    nn, err := cobj.conn.Write(b)
     cobj.mutex.Unlock()
+    if err != nil || nn != len(b) {
+        log.Print("Bytes not sent uuid: ",cobj.uuid,err)
+        errchan <- ConnId(cobj.conn) //TODO change ConnId for cobj.Uuid
+        return
+    }
+    log.Print("Bytes sent ", cobj.uuid)
 }
 
 // Writes String.
@@ -99,6 +141,7 @@ func (pool *ConnectionPool) Add(conn_uuid Uuid,connection net.Conn) {
     conn := new(ConnectionObj)
     conn.time = time.Now()
     conn.conn = connection
+    conn.uuid = conn_uuid
 	pool.mutex.Lock()
 	pool.list[conn_uuid] = conn
 	pool.mutex.Unlock()
@@ -134,7 +177,10 @@ func (pool *ConnectionPool) Remove(conn_uuid Uuid) {
 
 // Size of connections pool
 func (pool *ConnectionPool) Size() int {
-	return len(pool.list)
+    pool.mutex.Lock()
+    l := len(pool.list)
+    pool.mutex.Unlock()
+    return l
 }
 
 // Range iterates over pool
