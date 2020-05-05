@@ -14,9 +14,11 @@ import (
 )
 
 
+// TODO Add file for input
 func main() {
         address := "localhost:"
         port := flag.String("port", "50066", "port to connect")
+        messageContent := flag.String("msg", "This auto content", "message to send")
         connUuids := flag.String("uuids", "1,2","uuids with commas")
         count_max := flag.Int("max", 1,"Number of msgs to send.")
         flag.Parse()
@@ -51,11 +53,9 @@ func main() {
         log.Print("Uuids: ", ids)
 
 	var mime = map[string]string{
-		"Content-type": "text",
-		"Content-length": "32",
+		"Content-Type": "text",
 	}
-	str := "My content of the message"
-	msg := []byte(str)
+	msg := []byte(*messageContent)
 
 	rep := new(pb.ReplicationMsg)
 	rep.CUuids=ids

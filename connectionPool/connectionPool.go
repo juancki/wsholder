@@ -102,7 +102,7 @@ func (cobj *ConnectionObj) Write(b []byte, errchan chan Uuid){
         errchan <- ConnId(cobj.conn) //TODO change ConnId for cobj.Uuid
         return
     }
-    log.Print("Bytes sent ", cobj.uuid)
+    log.Print("Bytes sent ", cobj.uuid, " ",len(b))
 }
 
 // Writes String.

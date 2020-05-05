@@ -2,8 +2,8 @@
 package main
 
 import (
-	"bufio"
 	"encoding/base64"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"log"
@@ -111,7 +111,10 @@ func serveReplication(rep *pb.ReplicationMsg, errchan chan cPool.Uuid) {
             log.Print("Unable to marshal message")
             continue
         }
-        go c.Write(bts, errchan)
+        bts2 := make([]byte,len(bts)+binary.MaxVarintLen64)
+        binary.PutUvarint(bts2,uint64(len(bts)))
+        copy(bts2[binary.MaxVarintLen64:],bts)
+        go c.Write(bts2, errchan)
     }
 }
 
@@ -139,9 +142,7 @@ func coorFromBase64(str string) (float64,float64){
 
 func addToPoolAndUpdateRedis(cn net.Conn) error {
     ID := cPool.ConnId(cn)
-    writer := bufio.NewWriter(cn)
-    writer.WriteString("Ack\n")
-    writer.Flush()
+    cn.Write(make([]byte,binary.MaxVarintLen64)) // Send emty message
     // ADD to POOL 
     pool.Add(cPool.Uuid(ID), cn)
     bts := make([]byte,100) // Decide token size
@@ -174,7 +175,7 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
         log.Println(geoAdd.Err())
         return geoAdd.Err()
     }
-    log.Println("Geoadd succesful, UUID: ", ID)
+    log.Println("Geoadd token: ", token, " UUID: ", ID, " / ", cPool.Uuid2base64(ID))
     return nil
 }
 
