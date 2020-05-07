@@ -104,8 +104,8 @@ func serveReplication(rep *pb.ReplicationMsg, errchan chan cPool.Uuid) {
         // TODO if c.IsClosed(){
         // }
         msg := &pb.UniMsg{}
+        msg.Meta = rep.Meta
         msg.Msg = rep.Msg
-        msg.MsgMime = rep.MsgMime
         bts, err := proto.Marshal(msg)
         if err != nil {
             log.Print("Unable to marshal message")

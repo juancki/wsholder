@@ -1,6 +1,7 @@
 ## Generate .pb.go files 
 
 
+protoc --version
 AUX=$PATH
 
 PATH=$PATH:$GOPATH/bin

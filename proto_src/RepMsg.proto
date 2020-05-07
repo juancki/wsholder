@@ -1,7 +1,10 @@
 syntax = "proto3";
 
-option go_package="pb";
+option go_package = ".;pb";
 package pb;
+
+
+import "protobuf/timestamp.proto";
 
 /* https://developers.google.com/protocol-buffers/docs/proto?csw=1#scalar */
 
@@ -24,8 +27,8 @@ message Empty {
 //      + message for all with given prefix
 message ReplicationMsg{
     repeated uint64 c_uuids = 1;
-    map<string,string> msg_mime = 2;
-    bytes msg = 3;
+    bytes msg = 2;
+    Metadata meta = 3;
 }
 
 service Service {
@@ -34,7 +37,32 @@ service Service {
 
 
 message UniMsg{
-    map<string,string> msg_mime = 2;
-    bytes msg = 3;
+    bytes msg = 2;
+    Metadata meta = 3;
 }
+
+message Metadata{
+    string resource = 1; // The resource contains the parent-id and child-id
+    string poster = 2; // Id of the user that posted this issue
+
+    google.protobuf.Timestamp arrived = 3;
+    string originalLocation = 4; // Could use custom bits 
+
+    map<string,string> msg_mime = 5;
+    map<string,string> other = 6;
+}
+
+
+// message Timestamp {
+//   // Represents seconds of UTC time since Unix epoch
+//   // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
+//   // 9999-12-31T23:59:59Z inclusive.
+//   int64 seconds = 1;
+// 
+//   // Non-negative fractions of a second at nanosecond resolution. Negative
+//   // second values with fractions must still have non-negative nanos values
+//   // that count forward in time. Must be from 0 to 999,999,999
+//   // inclusive.
+//   int32 nanos = 2;
+// }
 

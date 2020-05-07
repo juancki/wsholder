@@ -96,7 +96,8 @@ func main() {
 
     for true {
         rcv := &pb.UniMsg{}
-        rcv.MsgMime = make(map[string]string)
+        rcv.Meta = &pb.Metadata{}
+        rcv.Meta.MsgMime = make(map[string]string)
         length, err := getNextMessageLength(conn)
         if err != nil{
             fmt.Println(err)
@@ -113,13 +114,15 @@ func main() {
             fmt.Println(err)
             return
         }
-        fmt.Print("Len: ",len(rcv.GetMsg())," ")
-        fmt.Print(rcv.GetMsgMime())
-        if tpe, ok := rcv.GetMsgMime()["Content-Type"]; ok && tpe != "bytes"{
-            fmt.Print(" `",string(rcv.GetMsg()),"`")
-        }else{
-            fmt.Println()
+        fmt.Print(len(rcv.GetMsg()),"B ")
+        if rcv == nil || rcv.Meta == nil{
+            continue
         }
+        fmt.Print(rcv.GetMeta().Resource, " ", rcv.Meta.Poster)
+        fmt.Print(rcv.GetMeta().GetMsgMime())
+        if tpe, ok := rcv.GetMeta().GetMsgMime()["Content-Type"]; ok && tpe != "bytes"{
+            fmt.Print(" `",string(rcv.GetMsg()),"`")
+        }
+        fmt.Println()
     }
-
 }

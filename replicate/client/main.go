@@ -3,14 +3,14 @@ package main
 
 import (
 	"context"
-        "strconv"
-        "strings"
-        "flag"
+	"flag"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
-	"google.golang.org/grpc"
 	"github.com/juancki/wsholder/pb"
+	"google.golang.org/grpc"
 )
 
 
@@ -58,8 +58,9 @@ func main() {
 	msg := []byte(*messageContent)
 
 	rep := new(pb.ReplicationMsg)
+        rep.Meta = new(pb.Metadata)
 	rep.CUuids=ids
-	rep.MsgMime = mime
+	rep.Meta.MsgMime = mime
 	rep.Msg = msg
         for count:=0; count<*count_max; count++{
 	    err = r.Send(rep)
