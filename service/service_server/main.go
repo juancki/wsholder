@@ -35,7 +35,8 @@ func (s *server) LotsOfReplies(in *pb.Empty, lotsreplies pb.Service_LotsOfReplie
 	msg := []byte(str)
 
 	rep := new(pb.UniMsg)
-	rep.MsgMime = mime
+	rep.Meta = new(pb.Metadata)
+	rep.Meta.MsgMime = mime
 	rep.Msg = msg
         for i:=0; i<10;i++{
 	    lotsreplies.Send(rep)
