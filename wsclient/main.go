@@ -46,10 +46,9 @@ func authenticate(name string, pass string, location string, url string) (string
     p.Loc = location
 
     bts, err := json.Marshal(&p)
-    fmt.Println(string(bts))
     if err != nil{ return "", err}
 
-    fmt.Println("Accessing: ",url)
+    fmt.Println("Accessing: ",url, " with: ",string(bts))
     if err != nil{ return "", err}
 
     token := new(TokenResponse)
@@ -73,13 +72,21 @@ func main() {
     authloc := flag.String("authloc", "localhost:8000", "address to connect")
     name := flag.String("name", "John", "name to auth")
     pass := flag.String("pass", "Kevin", "password")
+    usetoken := flag.String("token", "", "Avoid auth and use token")
     location := flag.String("location", "13.13:20.20", "port to connect")
     flag.Parse()
-
-
-    token, err := authenticate(*name,*pass,*location,*authloc+"/auth")
-    if err != nil{
-        fmt.Println(err)
+    fmt.Println(*usetoken)
+    fmt.Println(len(*usetoken))
+    token := ""
+    var err error
+    if len(*usetoken)==0{
+        token, err = authenticate(*name,*pass,*location,*authloc+"/auth")
+        if err != nil{
+            fmt.Println(err)
+        }
+    }else{
+        fmt.Println("-token flag passed, avoiding authentication step")
+        token = *usetoken
     }
     fmt.Println("Token: ", token)
 
@@ -89,7 +96,6 @@ func main() {
     sendbytes[0] = ':'
     sendbytes[len(token)+2-1] = '\n'
     copy(sendbytes[1:],token[:])
-    fmt.Println(string(sendbytes))
     writer := bufio.NewWriter(conn)
     writer.WriteString(string(sendbytes))
     writer.Flush()

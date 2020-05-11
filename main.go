@@ -10,11 +10,11 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v7"
 	"github.com/golang/protobuf/proto"
+	mydb "github.com/juancki/authloc/dbutils"
 	cPool "github.com/juancki/wsholder/connectionPool"
 	"github.com/juancki/wsholder/pb"
 	"google.golang.org/grpc"
@@ -50,13 +50,6 @@ type server struct {
 }
 
 
-// Removes uuid from the redis geo database (thread safe).
-func (rgeo *Redis) geoRemove(uuid cPool.Uuid) error {
-    rgeo.Lock()
-    res := rgeo.redis.ZRem(WORLD,cPool.Uuid2base64(uuid))
-    rgeo.Unlock()
-    return res.Err()
-}
 
 func replicateErr(errchan chan cPool.Uuid){
     for uuid := range errchan{
@@ -64,7 +57,7 @@ func replicateErr(errchan chan cPool.Uuid){
         // Delete from cPool
         pool.Remove(uuid)
         // Delete from Redis geo
-        err := rgeoclient.geoRemove(uuid)
+        err := rgeoclient.GeoRemoveCuuid(uuid)
         if err!=nil{
             log.Print("Trying to geoRemove error: ", err)
         }
@@ -142,34 +135,31 @@ func coorFromBase64(str string) (float64,float64){
 
 func addToPoolAndUpdateRedis(cn net.Conn) error {
     ID := cPool.ConnId(cn)
-    cn.Write(make([]byte,binary.MaxVarintLen64)) // Send emty message
-    // ADD to POOL 
-    pool.Add(cPool.Uuid(ID), cn)
-    bts := make([]byte,100) // Decide token size
+    cn.Write(make([]byte,binary.MaxVarintLen64)) // Send empty message
+    bts := make([]byte,100) // TODO Decide token size
     read, err := cn.Read(bts)
     if err != nil{
         return err
     }
+    // Append if exists
     token := string(bts[1:read-1])
     // UPDATE REDIS
-    appendError := rclient.redis.Append(token,cPool.Uuid2base64(ID)).Err()
-    value, err := rclient.Get(token)
-    if appendError != nil {
-        log.Println(appendError)
-        return appendError
-    }
+    row, err := rclient.AppendCuuidIfExists(token,ID)
     if err != nil {
         log.Println(err)
         return err
     }
+    // ADD to POOL 
+    pool.Add(cPool.Uuid(ID), cn)
     // value from the key,value store
-    long,lat := coorFromBase64(value)
+    base64Coor := strings.Split(row, ":")[1]
+    long,lat := coorFromBase64(base64Coor)
     geoloc := &redis.GeoLocation{}
     geoloc.Latitude = lat
     geoloc.Longitude= long
     geoloc.Name = cPool.Uuid2base64(ID)
     rgeoclient.Lock()
-    geoAdd := rgeoclient.redis.GeoAdd(WORLD,geoloc)
+    geoAdd := rgeoclient.Redis.GeoAdd(WORLD,geoloc)
     rgeoclient.Unlock()
     if geoAdd.Err() != nil{
         log.Println(geoAdd.Err())
@@ -220,62 +210,9 @@ func rutineBack(addr string){
     }
 }
 
-type Redis struct{
-    redis *redis.Client
-    sync.Mutex
-}
 
-
-// type Postgre struct{
-//     pg sql.DB
-//     sync.Mutex
-// }
-
-
-func NewRedis(connURL string) *Redis{
-    // redis://password@netloc:port/dbnum
-    // redis does not have a username
-    key := "postgresql://"
-    if strings.HasPrefix(connURL,key){
-        connURL = connURL[len(key):]
-    }
-    dbnum,_ := strconv.Atoi(strings.Split(connURL,"/")[1])
-    connURL = strings.Split(connURL,"/")[0]
-
-    pass := strings.Split(connURL,"@")[0]
-    log.Print("`",pass,"`\t",len(pass))
-    addr := strings.Split(connURL,"@")[1]
-    client := redis.NewClient(&redis.Options{
-            Addr:     addr,
-            Password: "", // no password set
-            DB:       dbnum,  // use default DB
-    })
-
-    pong, err := client.Ping().Result()
-    if err != nil{
-        // Exponential backoff
-        log.Print("Un able to connect to REDIS `", dbnum,"` at: `", addr, "` with password: `",pass,"`.")
-        log.Print(err)
-        return nil
-    }
-    log.Print("I said PING, Redis said: ",pong)
-    return &Redis{redis: client}
-
-}
-
-func (*Redis) Get(key string) (string,error){
-    rclient.Lock()
-    val, err := rclient.redis.Get(key).Result()
-    rclient.Unlock()
-    if err != nil {
-        log.Println("Not succesful: ", key, " ", err)
-        return "",err
-    }
-    return val, nil
-}
-
-var rclient *Redis
-var rgeoclient *Redis
+var rclient *mydb.Redis
+var rgeoclient *mydb.Redis
 
 func main() {
     // flag for configuration via command line
@@ -295,12 +232,12 @@ func main() {
     // Set up redis
     rclient = nil
     for rclient == nil{
-        rclient = NewRedis(*redis)
+        rclient = mydb.NewRedis(*redis)
         time.Sleep(time.Second*1)
     }
     rgeoclient = nil
     for rgeoclient == nil{
-        rgeoclient  = NewRedis(*redisGeo)
+        rgeoclient  = mydb.NewRedis(*redisGeo)
         time.Sleep(time.Second*1)
     }
     // Starting server

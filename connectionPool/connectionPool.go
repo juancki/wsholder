@@ -17,12 +17,24 @@ import (
 
 type (Uuid = uint64)
 // Converstion types utils
+// Uuid <---> []byte
+func Uuid2Bytes(uuid Uuid) []byte{
+    bts := make([]byte, binary.MaxVarintLen64)
+    binary.BigEndian.PutUint64(bts, uuid)
+    return bts
+}
+
+func Bytes2Uuid(bts []byte) Uuid{
+    r := binary.BigEndian.Uint64(bts)
+    return r
+}
 // Returns string from UUID currently uint64
 func Uuid2base64(uuid Uuid) string{
-    bts := make([]byte,8)
-    binary.PutUvarint(bts,uuid)
+    bts := Uuid2Bytes(uuid)
     return base64.StdEncoding.EncodeToString(bts)
 }
+
+
 // Returns uuid based on base64 encoding
 func Base64_2_uuid(str string) (Uuid,error){
     bts,err := base64.StdEncoding.DecodeString(str)
@@ -30,12 +42,7 @@ func Base64_2_uuid(str string) (Uuid,error){
         log.Print("Base64_2_uuid input: `",str,"`")
         return 0, err
     }
-    result, l :=  binary.Uvarint(bts)
-
-    if l == 0{
-        return 0, errors.New("Unable to cast fronm base64 to uuid in base64_2_uuid")
-    }
-    return Uuid(result),nil
+    return Bytes2Uuid(bts), nil
 }
 // ConnectionPool is a thread safe list of net.Conn instances
 type ConnectionPool struct {
@@ -87,7 +94,7 @@ func ConnId(conn net.Conn) Uuid{
         copy(dst[2:6],ip[12:])
         dst[6] = byte(port >> 8)
         dst[7] = byte(port &0x00FF)
-        return binary.BigEndian.Uint64(dst)
+        return Bytes2Uuid(dst)
     }
 }
 
