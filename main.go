@@ -112,6 +112,14 @@ func serveReplication(rep *pb.ReplicationMsg, errchan chan cPool.Uuid) {
 }
 
 
+func base64_2_string(b64 string) string {
+    coorbts , err := base64.StdEncoding.DecodeString(b64)
+    if err != nil {
+        return ""
+    }
+    return string(coorbts)
+}
+
 func coorFromBase64(str string) (float64,float64){
     // log.Println("entering coorFromBase64")
     splits := strings.SplitN(str,":",3)
@@ -152,7 +160,8 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
     // ADD to POOL 
     pool.Add(cPool.Uuid(ID), cn)
     // value from the key,value store
-    base64Coor := strings.Split(row, ":")[1]
+    base64Coor := strings.Split(row, ":")[0]
+    base64User := strings.Split(row, ":")[1]
     long,lat := coorFromBase64(base64Coor)
     geoloc := &redis.GeoLocation{}
     geoloc.Latitude = lat
@@ -161,6 +170,7 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
     rgeoclient.Lock()
     geoAdd := rgeoclient.Redis.GeoAdd(WORLD,geoloc)
     rgeoclient.Unlock()
+    rclient.SetUseridCuuid(base64_2_string(base64User), ID)
     if geoAdd.Err() != nil{
         log.Println(geoAdd.Err())
         return geoAdd.Err()
@@ -231,11 +241,13 @@ func main() {
     }
     // Set up redis
     rclient = nil
+    rclient = mydb.NewRedis(*redis)
     for rclient == nil{
         rclient = mydb.NewRedis(*redis)
         time.Sleep(time.Second*1)
     }
     rgeoclient = nil
+    rgeoclient  = mydb.NewRedis(*redisGeo)
     for rgeoclient == nil{
         rgeoclient  = mydb.NewRedis(*redisGeo)
         time.Sleep(time.Second*1)

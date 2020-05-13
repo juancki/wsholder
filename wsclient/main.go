@@ -75,8 +75,6 @@ func main() {
     usetoken := flag.String("token", "", "Avoid auth and use token")
     location := flag.String("location", "13.13:20.20", "port to connect")
     flag.Parse()
-    fmt.Println(*usetoken)
-    fmt.Println(len(*usetoken))
     token := ""
     var err error
     if len(*usetoken)==0{
@@ -122,6 +120,7 @@ func main() {
         }
         fmt.Print(len(rcv.GetMsg()),"B ")
         if rcv == nil || rcv.Meta == nil{
+            fmt.Println()
             continue
         }
         fmt.Print(rcv.GetMeta().Resource, " ", rcv.Meta.Poster)
