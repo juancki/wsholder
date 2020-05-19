@@ -32,6 +32,7 @@ import (
 // TODO create docker composer to set everything up at same time
 
 // TODO find way the function cPool.Base64_2_Uuid was not working and now does (remove log line)
+// TODO send emtpy message to long lived connections to know if they are still on.
 
 // FEATURES 
 // TODO TODO Define incomming messages structure, sending bytes through socket not the greatest idea.
@@ -59,7 +60,7 @@ func replicateErr(errchan chan cPool.Uuid){
         // Delete from Redis geo
         err := rgeoclient.GeoRemoveCuuid(uuid)
         if err!=nil{
-            log.Print("Trying to geoRemove error: ", err)
+            log.Print("Error trying to geoRemove: ", err)
         }
     }
 }
@@ -147,6 +148,7 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
     bts := make([]byte,100) // TODO Decide token size
     read, err := cn.Read(bts)
     if err != nil{
+        log.Println("Connection")
         return err
     }
     // Append if exists
@@ -154,7 +156,7 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
     // UPDATE REDIS
     row, err := rclient.AppendCuuidIfExists(token,ID)
     if err != nil {
-        log.Println(err)
+        log.Println("Redis")
         return err
     }
     // ADD to POOL 
@@ -172,7 +174,6 @@ func addToPoolAndUpdateRedis(cn net.Conn) error {
     rgeoclient.Unlock()
     rclient.SetUseridCuuid(base64_2_string(base64User), ID)
     if geoAdd.Err() != nil{
-        log.Println(geoAdd.Err())
         return geoAdd.Err()
     }
     log.Println("Geoadd token: ", token, " UUID: ", ID, " / ", cPool.Uuid2base64(ID))
@@ -197,9 +198,14 @@ func rutineFront(addr string){
 
     // accept connection
     for true {
-        connection, _ := socket.Accept()
+        connection, err := socket.Accept()
+        if err != nil{
+            fmt.Println(err)
+            continue
+        }
         err = addToPoolAndUpdateRedis(connection)
         if err != nil{
+            fmt.Println(err)
             manageFrontError(connection)
         }
     }
@@ -210,9 +216,10 @@ func rutineBack(addr string){
     log.Print("Starting gRPC ws back: ",addr)
     lis, err := net.Listen("tcp",addr)
     if err != nil {
-        log.Fatalf("failed to listen: %v", err)
+        panic(err)
     }
     log.Println("gRPC ws back server started")
+    // TODO add Keep Alive parameters
     s := grpc.NewServer()
     pb.RegisterWsBackServer(s, &server{})
     if err := s.Serve(lis); err != nil {

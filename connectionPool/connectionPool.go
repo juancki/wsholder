@@ -105,11 +105,9 @@ func (cobj *ConnectionObj) Write(b []byte, errchan chan Uuid){
     nn, err := cobj.conn.Write(b)
     cobj.mutex.Unlock()
     if err != nil || nn != len(b) {
-        log.Print("Bytes not sent uuid: ",cobj.uuid,err)
         errchan <- ConnId(cobj.conn) //TODO change ConnId for cobj.Uuid
         return
     }
-    log.Print("Bytes sent ", cobj.uuid, " ",len(b))
 }
 
 // Writes String.
