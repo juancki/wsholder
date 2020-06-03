@@ -22,17 +22,24 @@ import (
 // TODO Add connection to REDIS and save when a connection gets into front.
 
 // Config
+// Add machine IP to the cuuid ids generated.
 
 // logs
 // TODO add connection debug option/service that indicates for 
 //      a Replications Msg which connection ids where forwarded and which not.
+
 // TODO clean logs
 
 // TODO create tests wsholder + Redis
 // TODO create docker composer to set everything up at same time
 
-// TODO find way the function cPool.Base64_2_Uuid was not working and now does (remove log line)
-// TODO send emtpy message to long lived connections to know if they are still on.
+// TODO Send emtpy message to long lived connections to know if they are still on.
+//  how Add connections to Datastructure (hashmap+double linkedlist) 
+//              + To access a connection is as easy as now. with the key (CUUID)
+//              + On write to connection -> llist remove -> llist append. Connections recently written upon will be located in the begining 
+//              + Have a process checking the older connections until gets to a high ratio of working connections
+//              + On error close connection and free the memory.
+
 
 // FEATURES 
 // TODO TODO Define incomming messages structure, sending bytes through socket not the greatest idea.
